@@ -1,7 +1,5 @@
 #This file will have a set of classes used throughout the program
 
-#must install classifier before this can be referenced: http://textminingonline.com/dive-into-nltk-part-v-using-stanford-text-analysis-tools-in-python
-
 #Imports for ParsePhoneNumber
 import json
 import pickle
@@ -15,7 +13,7 @@ from geopy.geocoders import GoogleV3,Nominatim
 import nltk
 import geopy
 
-tagger = Tagger('/opt/stanford-ner-2014-08-27/classifiers/english.all.3class.distsim.crf.ser.gz','/opt/stanford-ner-2014-08-27/stanford-ner.jar')
+#tagger = Tagger('/opt/stanford-postagger-full-2014-08-27/classifiers/english.all.3class.distsim.crf.ser.gz','/opt/stanford-postagger-full-2014-08-27/stanford-postagger-3.4.1.jar')
 
 addr_formatter = StreetAddressFormatter()
 
@@ -32,6 +30,65 @@ class Queue:
             return data
         else:
             return None
+#Consider having a generalized parse method for each of these objects
+class ParsePhoneNumber:
+        
+    #text is a string
+    def _letter_to_number(self,text):
+        text= text.upper()
+        text = text.replace("ONE","1")
+        text = text.replace("TWO","2")
+        text = text.replace("THREE","3")
+        text = text.replace("FOUR","4")
+        text = text.replace("FIVE","5")
+        text = text.replace("SIX","6")
+        text = text.replace("SEVEN","7")
+        text = text.replace("EIGHT","8")
+        text = text.replace("NINE","9")
+        text = text.replace("ZERO","0")
+        return text
+
+    #number is a string
+    #twilio creds is a tuple (auth_id,auth_key)
+    def _verify_phone_number(self,number):
+        #I know this worked at some point...test this on other computer
+        data = pickle.load(open("twilio.creds","r"))
+        r = requests.get("http://lookups.twilio.com/v1/PhoneNumbers/"+number,auth=data)
+        if "status_code" in json.loads(r.content).keys():
+            return False
+        else:
+            return True
+        
+    #values is a dictionary
+    def phone_number_parse(self,values):
+        phone_numbers = []
+        text = self._letter_to_number(values["text_body"])
+        phone = []
+        counter = 0
+        found = False
+        possible_numbers = []
+        for ind,letter in enumerate(text):
+            if letter.isdigit():
+                phone.append(letter)
+                found = True
+            else:
+                if found:
+                    counter += 1
+                if counter > 15 and found:
+                    phone = []
+                    counter = 0
+                    found = False
+	    #country codes can be two,three digits
+            if len(phone) == 10 and phone[0] != '1':
+                possible_numbers.append(''.join(phone))
+                phone = phone[1:]
+            if len(phone) == 11 and phone[0] == '1':
+                possible_numbers.append(''.join(phone))
+                phone = phone[1:]
+        for number in possible_numbers:
+            if self._verify_phone_number(number):
+                phone_numbers.append(number)
+        return phone_numbers
 
 
 class ParseAddress:
@@ -82,6 +139,8 @@ class ParseAddress:
             except geopy.geocoders.googlev3.GeocoderQueryError:
                 return None
         
+    #remove near, split on commas, 
+    #tag - div style="padding-left:2em;
     #two possible return "types" - complete a real address or cross streets, which only gives two cross streets and therefore an approximate area
     def preprocess(self,text):
         #this case is included because usaddress doesn't do a great job if there isn't a number at parsing semantic information
@@ -99,21 +158,24 @@ class ParseAddress:
                 else:
                     addr_dict[key] = value
             return addr_dict,"complete"
-        else:
-            possible_streets = []
-            for word,tag in tagger.tag(text.split()):
-                if tag == 'LOCATION':
-                    possible_streets.append(word)
-            parts = nltk.pos_tag(nltk.word_tokenize(text))
-            for part in parts:
-                if any([part[1]==noun for noun in nouns]):
-                    possible_streets.append(part[0])
-            return possible_streets,"cross streets"
+        # else:
+        #     possible_streets = []
+        #     for word,tag in tagger.tag(text.split()):
+        #         if tag == 'LOCATION':
+        #             possible_streets.append(word)
+        #     parts = nltk.pos_tag(nltk.word_tokenize(text))
+        #     for part in parts:
+        #         if any([part[1]==noun for noun in nouns]):
+        #             possible_streets.append(part[0])
+        #     return possible_streets,"cross streets"
 	 
         #addresses: http://stackoverflow.com/questions/11160192/how-to-parse-freeform-street-postal-address-out-of-text-and-into-components
         #To do: build general list from http://www.nyc.gov/html/dcp/html/bytes/dwnlion.shtml
         #And from https://gis.nyc.gov/gisdata/inventories/details.cfm?DSID=932
         
+        #Here I need to add Part of Speech tagging and pull out all the nouns as possible street names.
+        #Then I need to come up with a list of street names in NYC and run each noun through the list
+        #From there I'll have all the street names
             
 
     

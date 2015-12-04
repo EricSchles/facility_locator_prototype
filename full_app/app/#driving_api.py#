@@ -10,3 +10,4 @@ def get_driving_directions(orig_coord,dest_coord):
     url = "https://maps.googleapis.com/maps/api/directions/json?origin={0}&destination={1}&mode=driving&language=en&key={2}".format(str(orig_coord),str(dest_coord),str(api_key))
     result= simplejson.load(urllib.urlopen(url))
     return result
+
