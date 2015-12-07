@@ -13,25 +13,43 @@ from nltk.tag.stanford import StanfordNERTagger as Tagger
 from geopy.geocoders import GoogleV3,Nominatim
 import nltk
 import geopy
+import lxml.html
 
-tagger = Tagger('/opt/stanford-postagger-full-2014-08-27/classifiers/english.all.3class.distsim.crf.ser.gz','/opt/stanford-postagger-full-2014-08-27/stanford-postagger-3.4.1.jar')
+tagger = Tagger('/opt/stanford-ner-2014-08-27/classifiers/english.all.3class.distsim.crf.ser.gz','/opt/stanford-ner-2014-08-27/stanford-ner-3.4.1.jar')
 
 addr_formatter = StreetAddressFormatter()
 
+def usaddress_to_dict(text):
+    addr = usaddress.parse(text)
+    addr = [elem for elem in addr if elem[1] != 'Recipient']
+    addr_dict = {}
+    for value,key in addr:
+        if key in addr_dict.keys():
+            addr_dict[key] += " "+value
+        else:
+            addr_dict[key] = value
+    return addr_dict
 
 class Distance:
-    def __init__(self,start_addr,start_place,destination_addr,destination_place):
+    def __init__(self,start_addr,destination_addr,start_place=None,destination_place=None):
         self.addr_parser = ParseAddress()
-        self.start_addr = start_addr
-        self.start_place = start_place
-        self.destination_addr = destination_addr
-        self.destination_place = destination_place
+        if start_place:
+            self.start_addr = start_addr
+            self.start_place = start_place
+        else:
+            start_addr_dict = usaddress_to_dict(start_addr)
+            self.start_place = start_addr_dict["PlaceName"] + " " + start_addr_dict["StateName"] 
+            
+        if destination_place:
+            self.destination_addr = destination_addr
+            self.destination_place = destination_place
+        else:
+            destination_addr_dict = usaddress_to_dict(destination_addr)
+            self.destination_place = destination_addr_dict["PlaceName"] + " " + destination_addr_dict["StateName"]
+        
         self.start_lat_long = self.addr_parser.parse(start_addr,start_place)
         self.destination_lat_long = self.addr_parser.parse(destination_addr,destination_place)
-
-    def parse_place(self,address):
         
-
     def get_driving_directions():
         api_key = pickle.load(open("google_driving.pickle","r"))
         url = "https://maps.googleapis.com/maps/api/directions/json?origin={0}&destination={1}&mode=driving&language=en&key={2}".format(str(self.start_addr),str(self.destination_addr),str(api_key))
@@ -39,7 +57,7 @@ class Distance:
         return result
 
     def get_distance():
-        
+        pass
 
 
 class ParseAddress:
@@ -57,6 +75,15 @@ class ParseAddress:
             addr = addr.replace("st.","street")
         return addr
         
+    def place_to_lat_long(self,city,state):
+        xml_response = requests.get("http://maps.googleapis.com/maps/api/geocode/xml?address={0}+{1}&sensor=false".format(str(city),str(state))).text
+        xml_response = xml_response.split("\n")[1:] #strip header
+        xml = lxml.html.fromstring("\n".join(xml_response))
+        lat_long = xml.xpath("//geometry/location")[0].text_content().split("\n")
+        lat_long = [elem.strip() for elem in lat_long]
+        lat_long = [elem for elem in lat_long if elem != '']
+        return lat_long
+
     #The parse will get you a lat/long representation of the address, which exists somewhere in the passed in text.
     #It expects free form text or a complete address
     def parse(self,text,place="NYC"):
@@ -100,14 +127,7 @@ class ParseAddress:
         #It isn't that great at approximate locations
         nouns = ['NN','NNP','NNPS','NNS']
         if any([elem.isdigit() for elem in text.split(" ")]):
-            addr = usaddress.parse(text)
-            addr = [elem for elem in addr if elem[1] != 'Recipient']
-            addr_dict = {}
-            for value,key in addr:
-                if key in addr_dict.keys():
-                    addr_dict[key] += " "+value
-                else:
-                    addr_dict[key] = value
+            addr_dict = usaddress_to_dict(text)
             return addr_dict,"complete"
         else:
             possible_streets = []
