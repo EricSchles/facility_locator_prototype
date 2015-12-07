@@ -17,6 +17,6 @@ class AddressLogger(db.Model):
     def __init__(self,lat=0.0,long=0.0):
         self.lat = lat
         self.long = long
-    def __repr(self):
+    def __repr__(self):
         return '<lat_long %r>' % str(self.lat)+","+str(self.long)
 

@@ -7,7 +7,7 @@ import platform
 #This basic server will send data to the leaflet frontend
 from random import randint
 import json 
-from flaskext import uploads
+#from flaskext import uploads
 import pandas as pd 
 import os
 from werkzeug import secure_filename
@@ -25,10 +25,7 @@ def index():
 #Data Visualization Routes
 #Map routes
 
-if platform.system() == 'Darwin':
-    UPLOAD_FOLDER = os.getcwd() + "/app/static/uploads"
-else:
-    UPLOAD_FOLDER = os.getcwd() + "/static/uploads"
+UPLOAD_FOLDER = os.getcwd() + "/app/static/uploads"
     
 ALLOWED_EXTENSIONS = set(['csv'])
 

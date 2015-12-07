@@ -4,6 +4,7 @@
 import json
 import pickle
 import requests
+import simplejson
 
 #Imports for ParseAddress
 import usaddress
@@ -13,82 +14,32 @@ from geopy.geocoders import GoogleV3,Nominatim
 import nltk
 import geopy
 
-#tagger = Tagger('/opt/stanford-postagger-full-2014-08-27/classifiers/english.all.3class.distsim.crf.ser.gz','/opt/stanford-postagger-full-2014-08-27/stanford-postagger-3.4.1.jar')
+tagger = Tagger('/opt/stanford-postagger-full-2014-08-27/classifiers/english.all.3class.distsim.crf.ser.gz','/opt/stanford-postagger-full-2014-08-27/stanford-postagger-3.4.1.jar')
 
 addr_formatter = StreetAddressFormatter()
 
-#a queue for storing processes
-class Queue:
-    def __init__(self):
-        self.internal_list = []
-    def put(self,data):
-        self.internal_list.append(data)
-    def get(self):
-        if self.internal_list != []:
-            data = self.internal_list[0]
-            del self.internal_list[0]
-            return data
-        else:
-            return None
-#Consider having a generalized parse method for each of these objects
-class ParsePhoneNumber:
-        
-    #text is a string
-    def _letter_to_number(self,text):
-        text= text.upper()
-        text = text.replace("ONE","1")
-        text = text.replace("TWO","2")
-        text = text.replace("THREE","3")
-        text = text.replace("FOUR","4")
-        text = text.replace("FIVE","5")
-        text = text.replace("SIX","6")
-        text = text.replace("SEVEN","7")
-        text = text.replace("EIGHT","8")
-        text = text.replace("NINE","9")
-        text = text.replace("ZERO","0")
-        return text
 
-    #number is a string
-    #twilio creds is a tuple (auth_id,auth_key)
-    def _verify_phone_number(self,number):
-        #I know this worked at some point...test this on other computer
-        data = pickle.load(open("twilio.creds","r"))
-        r = requests.get("http://lookups.twilio.com/v1/PhoneNumbers/"+number,auth=data)
-        if "status_code" in json.loads(r.content).keys():
-            return False
-        else:
-            return True
+class Distance:
+    def __init__(self,start_addr,start_place,destination_addr,destination_place):
+        self.addr_parser = ParseAddress()
+        self.start_addr = start_addr
+        self.start_place = start_place
+        self.destination_addr = destination_addr
+        self.destination_place = destination_place
+        self.start_lat_long = self.addr_parser.parse(start_addr,start_place)
+        self.destination_lat_long = self.addr_parser.parse(destination_addr,destination_place)
+
+    def parse_place(self,address):
         
-    #values is a dictionary
-    def phone_number_parse(self,values):
-        phone_numbers = []
-        text = self._letter_to_number(values["text_body"])
-        phone = []
-        counter = 0
-        found = False
-        possible_numbers = []
-        for ind,letter in enumerate(text):
-            if letter.isdigit():
-                phone.append(letter)
-                found = True
-            else:
-                if found:
-                    counter += 1
-                if counter > 15 and found:
-                    phone = []
-                    counter = 0
-                    found = False
-	    #country codes can be two,three digits
-            if len(phone) == 10 and phone[0] != '1':
-                possible_numbers.append(''.join(phone))
-                phone = phone[1:]
-            if len(phone) == 11 and phone[0] == '1':
-                possible_numbers.append(''.join(phone))
-                phone = phone[1:]
-        for number in possible_numbers:
-            if self._verify_phone_number(number):
-                phone_numbers.append(number)
-        return phone_numbers
+
+    def get_driving_directions():
+        api_key = pickle.load(open("google_driving.pickle","r"))
+        url = "https://maps.googleapis.com/maps/api/directions/json?origin={0}&destination={1}&mode=driving&language=en&key={2}".format(str(self.start_addr),str(self.destination_addr),str(api_key))
+        result= simplejson.loads(requests.get(url).text)
+        return result
+
+    def get_distance():
+        
 
 
 class ParseAddress:
@@ -158,16 +109,16 @@ class ParseAddress:
                 else:
                     addr_dict[key] = value
             return addr_dict,"complete"
-        # else:
-        #     possible_streets = []
-        #     for word,tag in tagger.tag(text.split()):
-        #         if tag == 'LOCATION':
-        #             possible_streets.append(word)
-        #     parts = nltk.pos_tag(nltk.word_tokenize(text))
-        #     for part in parts:
-        #         if any([part[1]==noun for noun in nouns]):
-        #             possible_streets.append(part[0])
-        #     return possible_streets,"cross streets"
+        else:
+            possible_streets = []
+            for word,tag in tagger.tag(text.split()):
+                if tag == 'LOCATION':
+                    possible_streets.append(word)
+            parts = nltk.pos_tag(nltk.word_tokenize(text))
+            for part in parts:
+                if any([part[1]==noun for noun in nouns]):
+                    possible_streets.append(part[0])
+            return possible_streets,"cross streets"
 	 
         #addresses: http://stackoverflow.com/questions/11160192/how-to-parse-freeform-street-postal-address-out-of-text-and-into-components
         #To do: build general list from http://www.nyc.gov/html/dcp/html/bytes/dwnlion.shtml
