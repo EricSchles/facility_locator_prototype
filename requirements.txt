@@ -4,7 +4,6 @@ gunicorn
 requests
 geopy
 nltk
-streetaddress
 usaddress
 lxml.html
 
