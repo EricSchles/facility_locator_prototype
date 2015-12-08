@@ -1,0 +1,10 @@
+Flask
+Flask-SQLAlchemy
+gunicorn
+requests
+geopy
+nltk
+streetaddress
+usaddress
+lxml.html
+
