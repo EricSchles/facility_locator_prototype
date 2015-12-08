@@ -5,5 +5,5 @@ requests
 geopy
 nltk
 usaddress
-lxml.html
+lxml
 
